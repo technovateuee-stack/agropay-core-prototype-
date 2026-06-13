@@ -1,7 +1,7 @@
-from fastapi import FastAPI, Depends, HTTPException, Form
+from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 import models
-from models import SessionLocal, engine, FarmerWallet, FeedAggregationPool, PoolState
+from models import SessionLocal, FarmerWallet, FeedAggregationPool, PoolState
 
 app = FastAPI(title="AgroPay Suite Production Engine Loop")
 
@@ -14,7 +14,11 @@ def get_db_session():
 
 @app.post("/api/v1/feedbulk/secure-commit")
 async def secure_commit_to_pool(user_id: int, pool_id: int, volume: int, db: Session = Depends(get_db_session)):
-    # Employ explicit SQLAlchemy row locks to prevent concurrent race conditions
+    
+    # Block negative injection volume exploits completely
+    if volume <= 0:
+        raise HTTPException(status_code=400, detail="Commitment volume must be greater than zero.")
+        
     pool = db.query(FeedAggregationPool).filter(FeedAggregationPool.id == pool_id).with_for_update().first()
     user = db.query(FarmerWallet).filter(FarmerWallet.id == user_id).with_for_update().first()
     
@@ -23,7 +27,7 @@ async def secure_commit_to_pool(user_id: int, pool_id: int, volume: int, db: Ses
         
     price_per_bag = 15000.0
     if pool.current_bags + volume >= pool.target_moq:
-        price_per_bag = 11000.0 # Direct wholesale factory rate triggered
+        price_per_bag = 11000.0 
         
     total_cost = volume * price_per_bag
     if user.balance < total_cost:
