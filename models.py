@@ -1,9 +1,14 @@
 import enum
-from sqlalchemy import Column, Integer, String, Float, ForeignKey, Enum, create_engine
+from sqlalchemy import Column, Integer, String, Float, Enum, create_engine
 from sqlalchemy.orm import declarative_base, sessionmaker
 
 DATABASE_URL = "sqlite:///./agropay_final_sandbox.db"
-engine = create_engine(DATABASE_URL, connect_args={"check_same_thread": False})
+
+# Safely queue concurrent writes
+engine = create_engine(
+    DATABASE_URL, 
+    connect_args={"check_same_thread": False, "timeout": 30}
+)
 SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
